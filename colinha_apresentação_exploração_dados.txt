@@ -1,0 +1,475 @@
+--sempre inicie entendo que tipos de dados possuimos
+select *
+from dicionario
+limit 10
+--entendi que só tem um atributo, um campo
+
+--veja qtd de linhas temos disponiveis, veja se há repetiçãodemo
+select count(1),count(distinct str_word)
+from dicionario
+-- nesse exemplo somente temo 19082, sem repetiçãodemo
+
+
+--entender se temos distribução de tamanho de letras por palavras 
+select LENGTH(str_word)  as tamanho_palavras
+		,count(1) as qtd_linhas
+from dicionario
+group by length(str_word)
+--nesse exemplo temos somente palavras 5 letras, foi preparado para podermos trabalhar
+
+--separando as "letras" de cada palavras para posteriormente entender seu comportamento
+--criando uma tabela nova para inserir separado
+--drop table DICIONARIO_words
+create table DICIONARIO_words(str_word varchar(10000)
+											,str_letter varchar(10000)
+											,int_position int);
+
+--inserindo cada "digito" de cada letra por palavra
+--primeira posição
+insert into DICIONARIO_words
+select str_word
+		, substring(str_word,1,1) as position_1
+		, 1
+from DICIONARIO 
+where LENGTH(STR_WORD) = 5;
+
+--segunda posição
+insert into DICIONARIO_words
+select str_word
+		, substring(str_word,2,1) as position_1
+		, 2
+from DICIONARIO 
+where LENGTH(STR_WORD) = 5;
+
+--terceira posição
+insert into DICIONARIO_words
+select str_word
+		, substring(str_word,3,1) as position_1
+		, 3
+from DICIONARIO 
+where LENGTH(STR_WORD) = 5;
+
+--quarta posição
+insert into DICIONARIO_words
+select str_word
+		, substring(str_word,4,1) as position_1
+		, 4
+from DICIONARIO 
+where LENGTH(STR_WORD) = 5;
+
+--quinta posição
+insert into DICIONARIO_words
+select str_word
+		, substring(str_word,5,1) as position_1
+		, 5
+from DICIONARIO 
+where LENGTH(STR_WORD) = 5;
+
+--avaliando o resultado
+select *
+from DICIONARIO_words
+where str_word = 'meião'
+limit 10
+
+--avaliar distribuição de letras por posição , por enquanto tudo com esperava
+select int_position
+		,count(1) as qtd_total
+from DICIONARIO_words
+group by int_position
+--mesma qtd de linhas 19082
+
+--vou iniciar o tratamento , sem acentuação para simplificar nosso dataset, 
+--e colocar todas as letras em maiuscula
+--drop table dicionario_words_refined
+CREATE TABLE IF NOT EXISTS dicionario_words_refined
+(
+	str_word VARCHAR(65535) 
+	,str_letter VARCHAR(65535)
+	,int_position INTEGER 
+	,str_letter_refined VARCHAR(65535) 
+)
+
+insert into DICIONARIO_words_refined
+select *
+	, case when  upper(str_letter) in ('À','Á','Â','Ã')  then 'A' 
+								when  upper(str_letter) in ('Ç')  then 'C' 
+								when  upper(str_letter) in ('È','É','Ê')  then 'E' 
+								when  upper(str_letter) in ('Í','Î','Ï')  then 'I' 
+								when  upper(str_letter) in ('Ó','Ô','Õ','Ö')  then 'O' 
+								when  upper(str_letter) in ('Ú','Ü','Û')  then 'U' 
+			else upper(str_letter) 
+			end as str_letter_refined
+from DICIONARIO_words
+
+
+--analisando o resultado, ver se foi o que esperava
+select *
+from DICIONARIO_words_refined
+where str_word = 'meião'
+limit 10
+
+--analisando se temos todas as letras do alfabeto, e sem acentuação
+select str_letter_refined
+		,count(1) qtd
+from  DICIONARIO_words_refined
+group by str_letter_refined
+order by 2 desc
+--distribução para apresentação
+
+
+
+
+--vogais mais frequentes, primeiro totais no calculo de percentual
+select count(1) total
+from DICIONARIO_words_refined
+where str_letter_refined in ('A','E','I','O','U')
+--total 47106
+
+--distribuição de vogais mais utilizadas
+--letras, contagem de utilização e percentual
+select (str_letter_refined),count(1), cast(count(1) as float)/47106 as percentual
+from DICIONARIO_words_refined
+where str_letter_refined in ('A','E','I','O','U')
+group by (str_letter_refined)
+order by 2 DESC
+
+
+--consoantes mais frequentes, primeiro totais no calculo de percentual
+select count(1) total
+from DICIONARIO_words_refined
+where str_letter_refined not in ('A','E','I','O','U')
+--total 48304
+
+
+--distribuição de consoantes mais utilizadas
+--letras, contagem de utilização e percentual
+select (str_letter_refined),count(1), cast(count(1) as float)/48304 as percentual
+from DICIONARIO_words_refined
+where str_letter_refined not in ('A','E','I','O','U')
+group by (str_letter_refined)
+order by 2 DESC
+
+
+
+-- distribuição geral de letras
+select count(1) total
+from DICIONARIO_words_refined
+--total 95410
+
+
+--distribuição de letras mais utilizadas
+--letras, contagem de utilização e percentual
+select (str_letter_refined),count(1)qtd_individual , cast(count(1) as float)/95410 as percentual
+from DICIONARIO_words_refined
+group by (str_letter_refined)
+order by 2 desc
+
+--dois trechos para analisar caso tenha uma recorrencia de letras
+--recorrencia de letras na mesma palavra 
+;with consulta_recorrencia as(
+							select str_word 
+								,str_letter_refined 
+								, count(1) contagem
+							from DICIONARIO_words_refined tmp_1
+							group by str_word 
+								,str_letter_refined 
+							having count(1)>1)
+select str_letter_refined ,count(distinct str_word) qtd_palavras
+from consulta_recorrencia ta
+where contagem >=2
+group by str_letter_refined
+order by 2 desc
+
+
+
+
+--Qual a frequencia uma vogal pode aparecer em uma palavra
+;with CONSULTA_FREQ as(
+							select STR_WORD , COUNT(1) FREQ_VOGAL
+							from  DICIONARIO_words_refined tmp_1
+							where str_letter_refined in ('A','E','I','O','U')
+							group by STR_WORD)
+select FREQ_VOGAL ,count(1) QTD_PALAVRAS, cast(count(1) as float)/18981 as percentual
+from CONSULTA_FREQ ta
+group by FREQ_VOGAL
+order by 2 desc
+
+
+-- A partir do silabario SIMPLES , tentei entender 
+-- com uma silaba ou multiplas silaba com a vogal
+-- bA cA dA fA gA hA jA kA lA mA nA pA rA SA tA vA wA xA yA zA
+-- quA separado
+--drop table dicionario_silabas
+select distinct tmp_1.str_word
+				,concat( tmp_1.str_letter_refined , tmp_2.str_letter_refined) as SILABA
+into dicionario_silabas
+from DICIONARIO_words_refined tmp_1
+join DICIONARIO_words_refined tmp_2
+	on tmp_1.str_word = tmp_2.str_word
+where --silabas com a vogal a
+--primeira posição 
+			((tmp_1.int_position = 1 and tmp_1.str_letter_refined not in ('A','E','I','O','U') )
+			and  --vogal a
+			(tmp_2.int_position = 2 and tmp_2.str_letter_refined in ('A')))
+		or
+--SEGUNDA posição 
+			((tmp_1.int_position = 2 and tmp_1.str_letter_refined not in ('A','E','I','O','U') )
+			and  --vogal a
+			(tmp_2.int_position = 3 and tmp_2.str_letter_refined in ('A')))
+--TERCEIRA posição 
+		or
+			((tmp_1.int_position = 3 and tmp_1.str_letter_refined not in ('A','E','I','O','U') )
+			and  --vogal a
+			(tmp_2.int_position = 4 and tmp_2.str_letter_refined in ('A')))
+--QUARTA posição 
+		or
+			((tmp_1.int_position = 4 and tmp_1.str_letter_refined not in ('A','E','I','O','U') )
+			and  --vogal a
+			(tmp_2.int_position = 5 and tmp_2.str_letter_refined in ('A')))
+union ALL
+select distinct tmp_1.str_word
+			, concat(tmp_1.str_letter_refined , tmp_2.str_letter_refined , tmp_3.str_letter_refined) as SILABA
+from DICIONARIO_words_refined tmp_1
+join DICIONARIO_words_refined tmp_2
+	on tmp_1.str_word = tmp_2.str_word
+join DICIONARIO_words_refined tmp_3
+	on tmp_1.str_word = tmp_3.str_word
+	and tmp_3.str_word = tmp_2.str_word
+where --silabas com a vogal a
+--primeira posição 
+			((tmp_1.int_position = 1 and tmp_1.str_letter_refined in ('Q') )
+			and  --vogal U
+			(tmp_2.int_position = 2 and tmp_2.str_letter_refined in ('U'))
+			and  --vogal a
+			(tmp_3.int_position = 3 and tmp_3.str_letter_refined in ('A')))
+		or
+			((tmp_1.int_position = 2 and tmp_1.str_letter_refined in ('Q') )
+			and  --vogal U
+			(tmp_2.int_position = 3 and tmp_2.str_letter_refined in ('U'))
+			and  --vogal a
+			(tmp_3.int_position = 4 and tmp_3.str_letter_refined in ('A')))
+		or
+			((tmp_1.int_position = 3 and tmp_1.str_letter_refined in ('Q') )
+			and  --vogal U
+			(tmp_2.int_position = 4 and tmp_2.str_letter_refined in ('U'))
+			and  --vogal a
+			(tmp_3.int_position = 5 and tmp_3.str_letter_refined in ('A')))
+			
+			
+--silabas com a vogal e
+insert into dicionario_silabas
+select distinct tmp_1.str_word
+				,concat( tmp_1.str_letter_refined , tmp_2.str_letter_refined) as SILABA
+from DICIONARIO_words_refined tmp_1
+join DICIONARIO_words_refined tmp_2
+	on tmp_1.str_word = tmp_2.str_word
+where --silabas com a vogal e
+--primeira posição 
+			((tmp_1.int_position = 1 and tmp_1.str_letter_refined not in ('A','E','I','O','U') )
+			and  --vogal e
+			(tmp_2.int_position = 2 and tmp_2.str_letter_refined in ('E')))
+		or
+--SEGUNDA posição 
+			((tmp_1.int_position = 2 and tmp_1.str_letter_refined not in ('A','E','I','O','U') )
+			and  --vogal e
+			(tmp_2.int_position = 3 and tmp_2.str_letter_refined in ('E')))
+--TERCEIRA posição 
+		or
+			((tmp_1.int_position = 3 and tmp_1.str_letter_refined not in ('A','E','I','O','U') )
+			and  --vogal e
+			(tmp_2.int_position = 4 and tmp_2.str_letter_refined in ('E')))
+--QUARTA posição 
+		or
+			((tmp_1.int_position = 4 and tmp_1.str_letter_refined not in ('A','E','I','O','U') )
+			and  --vogal e
+			(tmp_2.int_position = 5 and tmp_2.str_letter_refined in ('E')))
+union ALL
+select distinct tmp_1.str_word
+			,concat( tmp_1.str_letter_refined , tmp_2.str_letter_refined , tmp_3.str_letter_refined) as SILABA
+from DICIONARIO_words_refined tmp_1
+join DICIONARIO_words_refined tmp_2
+	on tmp_1.str_word = tmp_2.str_word
+join DICIONARIO_words_refined tmp_3
+	on tmp_1.str_word = tmp_3.str_word
+	and tmp_3.str_word = tmp_2.str_word
+where --silabas com a vogal e
+--primeira posição 
+			((tmp_1.int_position = 1 and tmp_1.str_letter_refined in ('Q') )
+			and  --vogal U
+			(tmp_2.int_position = 2 and tmp_2.str_letter_refined in ('U'))
+			and  --vogal e
+			(tmp_3.int_position = 3 and tmp_3.str_letter_refined in ('E')))
+		or
+			((tmp_1.int_position = 2 and tmp_1.str_letter_refined in ('Q') )
+			and  --vogal U
+			(tmp_2.int_position = 3 and tmp_2.str_letter_refined in ('U'))
+			and  --vogal e
+			(tmp_3.int_position = 4 and tmp_3.str_letter_refined in ('E')))
+		or
+			((tmp_1.int_position = 3 and tmp_1.str_letter_refined in ('Q') )
+			and  --vogal U
+			(tmp_2.int_position = 4 and tmp_2.str_letter_refined in ('U'))
+			and  --vogal e
+			(tmp_3.int_position = 5 and tmp_3.str_letter_refined in ('E')))
+			
+			
+--silabas com a vogal I
+insert into dicionario_silabas
+select distinct tmp_1.str_word
+				,concat( tmp_1.str_letter_refined , tmp_2.str_letter_refined) as SILABA
+from DICIONARIO_words_refined tmp_1
+join DICIONARIO_words_refined tmp_2
+	on tmp_1.str_word = tmp_2.str_word
+where --silabas com a vogal I
+--primeira posição 
+			((tmp_1.int_position = 1 and tmp_1.str_letter_refined not in ('A','E','I','O','U') )
+			and  --vogal e
+			(tmp_2.int_position = 2 and tmp_2.str_letter_refined in ('I')))
+		or
+--SEGUNDA posição 
+			((tmp_1.int_position = 2 and tmp_1.str_letter_refined not in ('A','E','I','O','U') )
+			and  --vogal e
+			(tmp_2.int_position = 3 and tmp_2.str_letter_refined in ('I')))
+--TERCEIRA posição 
+		or
+			((tmp_1.int_position = 3 and tmp_1.str_letter_refined not in ('A','E','I','O','U') )
+			and  --vogal e
+			(tmp_2.int_position = 4 and tmp_2.str_letter_refined in ('I')))
+--QUARTA posição 
+		or
+			((tmp_1.int_position = 4 and tmp_1.str_letter_refined not in ('A','E','I','O','U') )
+			and  --vogal e
+			(tmp_2.int_position = 5 and tmp_2.str_letter_refined in ('I')))
+union ALL
+select distinct tmp_1.str_word
+			,concat( tmp_1.str_letter_refined , tmp_2.str_letter_refined , tmp_3.str_letter_refined) as SILABA
+from DICIONARIO_words_refined tmp_1
+join DICIONARIO_words_refined tmp_2
+	on tmp_1.str_word = tmp_2.str_word
+join DICIONARIO_words_refined tmp_3
+	on tmp_1.str_word = tmp_3.str_word
+	and tmp_3.str_word = tmp_2.str_word
+where --silabas com a vogal e
+--primeira posição 
+			((tmp_1.int_position = 1 and tmp_1.str_letter_refined in ('Q') )
+			and  --vogal U
+			(tmp_2.int_position = 2 and tmp_2.str_letter_refined in ('U'))
+			and  --vogal e
+			(tmp_3.int_position = 3 and tmp_3.str_letter_refined in ('I')))
+		or
+			((tmp_1.int_position = 2 and tmp_1.str_letter_refined in ('Q') )
+			and  --vogal U
+			(tmp_2.int_position = 3 and tmp_2.str_letter_refined in ('U'))
+			and  --vogal e
+			(tmp_3.int_position = 4 and tmp_3.str_letter_refined in ('I')))
+		or
+			((tmp_1.int_position = 3 and tmp_1.str_letter_refined in ('Q') )
+			and  --vogal U
+			(tmp_2.int_position = 4 and tmp_2.str_letter_refined in ('U'))
+			and  --vogal e
+			(tmp_3.int_position = 5 and tmp_3.str_letter_refined in ('I')))
+			
+			
+			
+--silabas com a vogal O
+insert into dicionario_silabas
+select distinct tmp_1.str_word
+				,concat( tmp_1.str_letter_refined , tmp_2.str_letter_refined) as SILABA
+from DICIONARIO_words_refined tmp_1
+join DICIONARIO_words_refined tmp_2
+	on tmp_1.str_word = tmp_2.str_word
+where --silabas com a vogal O
+--primeira posição 
+			((tmp_1.int_position = 1 and tmp_1.str_letter_refined not in ('A','E','I','O','U') )
+			and  --vogal e
+			(tmp_2.int_position = 2 and tmp_2.str_letter_refined in ('O')))
+		or
+--SEGUNDA posição 
+			((tmp_1.int_position = 2 and tmp_1.str_letter_refined not in ('A','E','I','O','U') )
+			and  --vogal e
+			(tmp_2.int_position = 3 and tmp_2.str_letter_refined in ('O')))
+--TERCEIRA posição 
+		or
+			((tmp_1.int_position = 3 and tmp_1.str_letter_refined not in ('A','E','I','O','U') )
+			and  --vogal e
+			(tmp_2.int_position = 4 and tmp_2.str_letter_refined in ('O')))
+--QUARTA posição 
+		or
+			((tmp_1.int_position = 4 and tmp_1.str_letter_refined not in ('A','E','I','O','U') )
+			and  --vogal e
+			(tmp_2.int_position = 5 and tmp_2.str_letter_refined in ('O')))
+union ALL
+select distinct tmp_1.str_word
+			,concat( tmp_1.str_letter_refined , tmp_2.str_letter_refined , tmp_3.str_letter_refined) as SILABA
+from DICIONARIO_words_refined tmp_1
+join DICIONARIO_words_refined tmp_2
+	on tmp_1.str_word = tmp_2.str_word
+join DICIONARIO_words_refined tmp_3
+	on tmp_1.str_word = tmp_3.str_word
+	and tmp_3.str_word = tmp_2.str_word
+where --silabas com a vogal e
+--primeira posição 
+			((tmp_1.int_position = 1 and tmp_1.str_letter_refined in ('Q') )
+			and  --vogal U
+			(tmp_2.int_position = 2 and tmp_2.str_letter_refined in ('U'))
+			and  --vogal e
+			(tmp_3.int_position = 3 and tmp_3.str_letter_refined in ('O')))
+		or
+			((tmp_1.int_position = 2 and tmp_1.str_letter_refined in ('Q') )
+			and  --vogal U
+			(tmp_2.int_position = 3 and tmp_2.str_letter_refined in ('U'))
+			and  --vogal e
+			(tmp_3.int_position = 4 and tmp_3.str_letter_refined in ('O')))
+		or
+			((tmp_1.int_position = 3 and tmp_1.str_letter_refined in ('Q') )
+			and  --vogal U
+			(tmp_2.int_position = 4 and tmp_2.str_letter_refined in ('U'))
+			and  --vogal e
+			(tmp_3.int_position = 5 and tmp_3.str_letter_refined in ('O')))
+			
+			
+			
+			
+--silabas com a vogal U
+insert into dicionario_silabas
+select distinct tmp_1.str_word
+				,concat( tmp_1.str_letter_refined , tmp_2.str_letter_refined) as SILABA
+from DICIONARIO_words_refined tmp_1
+join DICIONARIO_words_refined tmp_2
+	on tmp_1.str_word = tmp_2.str_word
+where --silabas com a vogal O
+--primeira posição 
+			((tmp_1.int_position = 1 and tmp_1.str_letter_refined not in ('A','E','I','O','U') )
+			and  --vogal e
+			(tmp_2.int_position = 2 and tmp_2.str_letter_refined in ('U')))
+		or
+--SEGUNDA posição 
+			((tmp_1.int_position = 2 and tmp_1.str_letter_refined not in ('A','E','I','O','U') )
+			and  --vogal e
+			(tmp_2.int_position = 3 and tmp_2.str_letter_refined in ('U')))
+--TERCEIRA posição 
+		or
+			((tmp_1.int_position = 3 and tmp_1.str_letter_refined not in ('A','E','I','O','U') )
+			and  --vogal e
+			(tmp_2.int_position = 4 and tmp_2.str_letter_refined in ('U')))
+--QUARTA posição 
+		or
+			((tmp_1.int_position = 4 and tmp_1.str_letter_refined not in ('A','E','I','O','U') )
+			and  --vogal e
+			(tmp_2.int_position = 5 and tmp_2.str_letter_refined in ('U')))
+			
+--listando para verificar o preenchimento
+select *
+from dicionario_silabas
+where str_word = 'pomar'
+limit 10
+--total 34402
+
+--silabas mais usadas em 5 letras
+--Silabas simples, contagem de utilização e percentual
+select silaba,count(1) qtd, cast(count(1) as decimal(18,2))/34402 as percentual
+from dicionario_silabas
+group by silaba
+order by 2 desc
+			
+			
